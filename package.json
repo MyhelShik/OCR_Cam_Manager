@@ -7,9 +7,7 @@
     "dev": "vercel dev",
     "deploy": "vercel --prod"
   },
-  "dependencies": {
-    "@vercel/kv": "^3.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "vercel": "^44.7.3"
   }

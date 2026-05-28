@@ -2,7 +2,7 @@
 
 Small Vercel API for Finance Manager receipt parsing.
 
-The Flutter app sends OCR text to this endpoint. The endpoint keeps the Groq API key on the server side, applies a lightweight daily limit, calls Groq, and returns structured expense data.
+The Flutter app sends OCR text to this endpoint. The endpoint keeps the Groq API key on the server side, calls Groq, and returns structured expense data.
 
 ## Endpoint
 
@@ -25,8 +25,7 @@ Response:
   "amount": 12.5,
   "shop": "Continente",
   "category": "Food",
-  "date": "2026-05-28",
-  "remaining": 9
+  "date": "2026-05-28"
 }
 ```
 
@@ -42,11 +41,7 @@ Optional:
 
 ```text
 GROQ_MODEL=llama-3.1-8b-instant
-GUEST_DAILY_LIMIT=10
-USER_DAILY_LIMIT=50
 ```
-4
-If Vercel KV is connected to the project, the endpoint uses it for daily limits. Without KV, parsing still works, but rate limiting is skipped.
 
 ## Deploy
 
