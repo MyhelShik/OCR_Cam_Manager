@@ -45,7 +45,7 @@ GROQ_MODEL=llama-3.1-8b-instant
 GUEST_DAILY_LIMIT=10
 USER_DAILY_LIMIT=50
 ```
-
+4
 If Vercel KV is connected to the project, the endpoint uses it for daily limits. Without KV, parsing still works, but rate limiting is skipped.
 
 ## Deploy
