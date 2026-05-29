@@ -15,7 +15,7 @@ function buildPrompt(text) {
     {
       role: 'system',
       content:
-        'You extract expense data from OCR receipt text. Return only valid JSON with keys: amount, shop, category, date. amount must be a number or null. shop, category, date must be strings or null. date must use YYYY-MM-DD when present.',
+        'You extract expense data from OCR receipt text. Return only valid JSON with keys: amount, shop, category, date, time. amount must be a number or null. shop, category, date, and time must be strings or null. date must use YYYY-MM-DD when present. time must use HH:mm in 24-hour format when present.',
     },
     {
       role: 'user',
@@ -90,6 +90,7 @@ export default async function handler(req, res) {
       shop: parsed.shop ?? null,
       category: parsed.category ?? null,
       date: parsed.date ?? null,
+      time: parsed.time ?? null,
     });
   } catch (error) {
     const message =

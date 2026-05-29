@@ -25,7 +25,8 @@ Response:
   "amount": 12.5,
   "shop": "Continente",
   "category": "Food",
-  "date": "2026-05-28"
+  "date": "2026-05-28",
+  "time": "17:42"
 }
 ```
 
