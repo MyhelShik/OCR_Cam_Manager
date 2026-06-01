@@ -51,7 +51,7 @@ npm install
 npm run deploy
 ```
 
-After deployment, use the endpoint URL in Flutter:
+After deployment, uses the endpoint URL in Flutter:
 
 ```bash
 flutter run --dart-define=RECEIPT_PARSER_URL=https://your-project.vercel.app/api/receipt-parser
