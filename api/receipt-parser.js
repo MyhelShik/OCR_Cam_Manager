@@ -1,6 +1,21 @@
 const DEFAULT_MODEL = 'llama-3.1-8b-instant';
 const MAX_TEXT_LENGTH = 8000;
 
+function preprocessOcrText(ocrText) {
+  const ivaStart = ocrText.search(/Total\s*L[ií]q\.?/i);
+  if (ivaStart !== -1) {
+    ocrText = ocrText.substring(0, ivaStart);
+  }
+  
+  const lines = ocrText.split('\n');
+  const filteredLines = lines.filter(line => {
+    return !/\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\s+\d{4}\b/i.test(line);
+  });
+  ocrText = filteredLines.join('\n');
+  
+  return ocrText;
+}
+
 function send(res, status, body) {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -10,46 +25,28 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-function buildPrompt(text) {
+function buildPrompt(processedText) {
   return [
     {
       role: "system",
       content: `You are a strict receipt parser. Return ONLY valid JSON with keys: amount, shop, category, date, time.
 
-RULES (follow exactly):
-
+RULES:
 1. AMOUNT:
-   - Find "TOTAL A PAGAR". The correct total is the number that satisfies ONE of these:
-     a) For cash: "Numerário" minus "TROCO".
-     b) For card: "Cartão Crédito" amount equals sum of items.
-     c) For voucher ("VALE SDR", "VALE OFERTA", "VALE"): the voucher amount should cover the total; then total = sum of items.
-   - If no payment info, total = sum of item prices (each item price is a number after its description, often with "X" quantity).
-   - NEVER take a number from lines containing: "Total Liq.", "IVA", "VALOR", "%IVA", "XIVA", "Total" (alone), "Subtotal".
-   - Example of WRONG: in a receipt with "Total Liq. 1,74" and later "2,14" as final total, the correct total is 2,14.
+   - Find "TOTAL A PAGAR". The amount is the number immediately after or in the same vertical block.
+   - Validate: if cash ("Numerário" minus "TROCO") = amount. If card ("Cartao Credito") -> amount = sum of item prices.
+2. SHOP:
+   - "CONTINENTE" -> "Continente". Remove noise.
+3. CATEGORY:
+   - Section header above items: "Padaria:", "Soft Drinks:", "Mercearia:" etc. Map "Soft Drinks" -> "Bebidas".
+4. DATE & TIME:
+   - Look for pattern "DD/MM/YYYY HH:MM" (e.g., "02/06/2026 12:24"). Use that. Ignore any other dates.
 
-2. ITEMS SUM VALIDATION (mandatory):
-   - Find all item price numbers (they often appear in lines like "2 X 0,99" or just "1,49" alone, after item descriptions).
-   - Sum them. If sum matches a candidate number within ±0.01, that candidate is correct.
-
-3. SHOP:
-   - If "CONTINENTE" -> "Continente". Similarly for other chains. Remove OCR garbage.
-
-4. CATEGORY:
-   - Look for section headers: "Mercearia:", "Padaria:", "Soft Drinks:", "Talho:", etc. Map: "Soft Drinks" -> "Bebidas", "Mercearia" -> "Mercearia", "Padaria" -> "Padaria".
-   - Pick section with highest sum of its items.
-
-5. DATE & TIME:
-   - Find line with pattern "DD/MM/YYYY HH:MM" (e.g., "26/05/2026 16:37"). Use that. Ignore other dates.
-
-EXAMPLE (this is a correct parsing of a similar receipt):
-OCR text: "... TOTAL A PAGAR ... Numerário 5,00 ... TROCO 1,70 ... Total Liq. ... 1,71 ... 3,30 ..."
-Correct JSON: {"amount": 3.30, "shop": "Continente", "category": "Padaria", "date": "2026-06-02", "time": "12:24"}
-
-NOW PARSE THE FOLLOWING RECEIPT:`,
+OUTPUT ONLY JSON.`,
     },
     {
       role: "user",
-      content: `Receipt OCR text:\n${text}`,
+      content: `Receipt OCR text (cleaned):\n${text}`,
     },
   ];
 }
@@ -62,6 +59,9 @@ function parseGroqJson(content) {
 }
 
 export default async function handler(req, res) {
+
+let processedText = preprocessOcrText(text);
+
   if (req.method === 'OPTIONS') {
     return send(res, 204, {});
   }
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         model: process.env.GROQ_MODEL || DEFAULT_MODEL,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: buildPrompt(text),
+        messages: buildPrompt(preprocessOcrText(text)),
       }),
     });
 
