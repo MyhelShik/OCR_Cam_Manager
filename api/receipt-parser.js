@@ -13,50 +13,41 @@ function send(res, status, body) {
 function buildPrompt(text) {
   return [
     {
-      role: 'system',
-      content:
-`You are an expert receipt parser. Extract expense data from OCR text and return ONLY valid JSON with keys: amount, shop, category, date, time.
+      role: "system",
+      content: `You are a strict receipt parser. Return ONLY valid JSON with keys: amount, shop, category, date, time.
 
-CRITICAL RULES:
+RULES:
 
 1. AMOUNT (number or null):
-   - Look for the FINAL TOTAL to pay. Common labels: "TOTAL A PAGAR" (PT), "TOTAL" (ES/FR/DE), "SUMMA" (SE), "TOTALE" (IT), "GRAND TOTAL" (EN).
-   - NEVER take a number from the VAT/IVA breakdown area (lines with "Total Liq.", "IVA", "VALOR", "Base imponible", "Netto", "HT").
-   - If the total is split across columns: match the label "TOTAL A PAGAR" with the number in the same vertical position among a block of bare numbers.
-   - VALIDATE total (±0.01):
-     A) Sum of "Numerário"/"Dinheiro"/"Cash" minus "TROCO"/"Change" ≈ total.
-     B) Sum of item lines (marked (A),(B),(C),NS or lines ending with a price) ≈ total.
-   - If validation fails, try the next candidate (largest number near the total label).
+   - Find label "TOTAL A PAGAR" (case‑insensitive).
+   - The total is the number associated with it. If the number is not on the same line, look in the same column among numbers below (before the VAT breakdown lines like "Total Liq.", "IVA", "VALOR").
+   - MANDATORY VALIDATION (choose method based on payment method):
+     a) If payment is cash ("Numerário"/"Dinheiro"): find "TROCO" → total = paid - change.
+     b) If payment is card ("Cartão Crédito"/"Cartao Credito"/"MB"/"Multibanco"): total must equal the sum of item lines.
+   - NEVER take a number from lines containing: "Total Liq.", "IVA", "VALOR", "%IVA", "XIVA", "Total" (alone), "Subtotal".
+   - If validation fails, try the largest number that appears near "TOTAL A PAGAR" but not in the VAT table.
 
-2. SHOP (string):
-   - Normalize common chains:
-     "CONTINENTE" → "Continente"
-     "PINGO DOCE" → "Pingo Doce"
-     "LIDL" → "Lidl"
-     "AUCHAN"/"JUMBO" → "Auchan"
-     "INTERMARCH" → "Intermarché"
-     "MERCADONA" → "Mercadona"
-     "ALDI" → "Aldi"
-     "CARREFOUR" → "Carrefour"
-   - Remove OCR garbage (e.g., "HIPERInE", "HIPERMERCADUS1").
+2. SHOP:
+   - If "CONTINENTE" → "Continente". Also handle "PINGO DOCE", "LIDL", "AUCHAN", "MERCADONA", "ALDI", "INTERMARCH".
 
-3. CATEGORY (string or null):
-   - Find section headers above items: "Padaria", "Soft Drinks"→"Bebidas", "Mercearia", "Talho", "Peixaria", "Frutas e Legumes", "Lacticínios", "Higiene", "Limpeza".
-   - Pick the section with the highest total sum of its items.
-   - If no section → null.
+3. CATEGORY:
+   - Find section headers ("Mercearia:", "Padaria:", "Soft Drinks:", "Talho:", etc.).
+   - Sum the item values under each section (items often have price lines like "2 X 0,99" or "1,49").
+   - Choose the section with the highest sum.
+   - Mapping: "Soft Drinks" → "Bebidas", "Mercearia" → "Mercearia", "Padaria" → "Padaria", etc.
 
-4. DATE (string "YYYY-MM-DD" or null):
-   - European format: DD/MM/YYYY (majority of receipts). US format: MM/DD/YYYY only if store location suggests US.
-   - For dates like "02/06/2026" in a Portuguese receipt → day=02, month=06.
-   - Sanity check: if day > 12, it's definitely DD/MM.
+4. DATE & TIME:
+   - Look for a line containing a pattern like "DD/MM/YYYY HH:MM" (e.g., "12/06/2026 15:05").
+   - That is the correct date and time. Ignore other dates/times (e.g., later lines like "12 June 2026 16:41").
+   - Date format: DD/MM/YYYY → YYYY-MM-DD. Time: HH:MM (24h).
 
-5. TIME (string "HH:MM" or null):
-   - Extract time from patterns like "12:24" or "14:05". Use 24-hour format.
+5. NUMBER FORMAT:
+   - European: comma as decimal (1,84 → 1.84). Normalize spaces inside numbers ("1, 84" → "1,84").
 
-IMPORTANT: Return ONLY the JSON object. No extra text.`,
+OUTPUT ONLY JSON. NO EXTRA TEXT.`,
     },
     {
-      role: 'user',
+      role: "user",
       content: `Receipt OCR text:\n${text}`,
     },
   ];
