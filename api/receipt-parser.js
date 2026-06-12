@@ -46,7 +46,7 @@ OUTPUT ONLY JSON.`,
     },
     {
       role: "user",
-      content: `Receipt OCR text (cleaned):\n${text}`,
+      content: `Receipt OCR text (cleaned):\n${processedText}`,
     },
   ];
 }
@@ -59,9 +59,6 @@ function parseGroqJson(content) {
 }
 
 export default async function handler(req, res) {
-
-let processedText = preprocessOcrText(text);
-
   if (req.method === 'OPTIONS') {
     return send(res, 204, {});
   }
@@ -85,6 +82,9 @@ let processedText = preprocessOcrText(text);
     });
   }
 
+  // Предобработка текста – удаляем IVA-таблицу и английские даты
+  const processedText = preprocessOcrText(text);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
 
@@ -100,7 +100,7 @@ let processedText = preprocessOcrText(text);
         model: process.env.GROQ_MODEL || DEFAULT_MODEL,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: buildPrompt(preprocessOcrText(text)),
+        messages: buildPrompt(processedText),
       }),
     });
 
