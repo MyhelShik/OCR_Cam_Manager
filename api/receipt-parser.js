@@ -16,35 +16,36 @@ function buildPrompt(text) {
       role: "system",
       content: `You are a strict receipt parser. Return ONLY valid JSON with keys: amount, shop, category, date, time.
 
-RULES:
+RULES (follow exactly):
 
-1. AMOUNT (number or null):
-   - Find label "TOTAL A PAGAR" (case‑insensitive).
-   - The total is the number associated with it. If the number is not on the same line, look in the same column among numbers below (before the VAT breakdown lines like "Total Liq.", "IVA", "VALOR").
-   - MANDATORY VALIDATION (choose method based on payment method):
-     a) If payment is cash ("Numerário"/"Dinheiro"): find "TROCO" → total = paid - change.
-     b) If payment is card ("Cartão Crédito"/"Cartao Credito"/"MB"/"Multibanco"): total must equal the sum of item lines.
+1. AMOUNT:
+   - Find "TOTAL A PAGAR". The correct total is the number that satisfies ONE of these:
+     a) For cash: "Numerário" minus "TROCO".
+     b) For card: "Cartão Crédito" amount equals sum of items.
+     c) For voucher ("VALE SDR", "VALE OFERTA", "VALE"): the voucher amount should cover the total; then total = sum of items.
+   - If no payment info, total = sum of item prices (each item price is a number after its description, often with "X" quantity).
    - NEVER take a number from lines containing: "Total Liq.", "IVA", "VALOR", "%IVA", "XIVA", "Total" (alone), "Subtotal".
-   - If validation fails, try the largest number that appears near "TOTAL A PAGAR" but not in the VAT table.
+   - Example of WRONG: in a receipt with "Total Liq. 1,74" and later "2,14" as final total, the correct total is 2,14.
 
-2. SHOP:
-   - If "CONTINENTE" → "Continente". Also handle "PINGO DOCE", "LIDL", "AUCHAN", "MERCADONA", "ALDI", "INTERMARCH".
+2. ITEMS SUM VALIDATION (mandatory):
+   - Find all item price numbers (they often appear in lines like "2 X 0,99" or just "1,49" alone, after item descriptions).
+   - Sum them. If sum matches a candidate number within ±0.01, that candidate is correct.
 
-3. CATEGORY:
-   - Find section headers ("Mercearia:", "Padaria:", "Soft Drinks:", "Talho:", etc.).
-   - Sum the item values under each section (items often have price lines like "2 X 0,99" or "1,49").
-   - Choose the section with the highest sum.
-   - Mapping: "Soft Drinks" → "Bebidas", "Mercearia" → "Mercearia", "Padaria" → "Padaria", etc.
+3. SHOP:
+   - If "CONTINENTE" -> "Continente". Similarly for other chains. Remove OCR garbage.
 
-4. DATE & TIME:
-   - Look for a line containing a pattern like "DD/MM/YYYY HH:MM" (e.g., "12/06/2026 15:05").
-   - That is the correct date and time. Ignore other dates/times (e.g., later lines like "12 June 2026 16:41").
-   - Date format: DD/MM/YYYY → YYYY-MM-DD. Time: HH:MM (24h).
+4. CATEGORY:
+   - Look for section headers: "Mercearia:", "Padaria:", "Soft Drinks:", "Talho:", etc. Map: "Soft Drinks" -> "Bebidas", "Mercearia" -> "Mercearia", "Padaria" -> "Padaria".
+   - Pick section with highest sum of its items.
 
-5. NUMBER FORMAT:
-   - European: comma as decimal (1,84 → 1.84). Normalize spaces inside numbers ("1, 84" → "1,84").
+5. DATE & TIME:
+   - Find line with pattern "DD/MM/YYYY HH:MM" (e.g., "26/05/2026 16:37"). Use that. Ignore other dates.
 
-OUTPUT ONLY JSON. NO EXTRA TEXT.`,
+EXAMPLE (this is a correct parsing of a similar receipt):
+OCR text: "... TOTAL A PAGAR ... Numerário 5,00 ... TROCO 1,70 ... Total Liq. ... 1,71 ... 3,30 ..."
+Correct JSON: {"amount": 3.30, "shop": "Continente", "category": "Padaria", "date": "2026-06-02", "time": "12:24"}
+
+NOW PARSE THE FOLLOWING RECEIPT:`,
     },
     {
       role: "user",
